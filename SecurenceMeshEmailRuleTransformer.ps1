@@ -1,5 +1,5 @@
 # Prompt for the CSV file, domain, and choice
-$csvFile = Read-Host "Enter the path to the CSV file"
+$csvFile = Read-Host "Enter the path to the CSV file (with or without quotes)"
 $domain = Read-Host "Enter the domain"
 $choice = Read-Host "Enter 'allow' or 'block'"
 
@@ -15,20 +15,41 @@ $newData = @()
 # Process each row in the CSV
 foreach ($row in $data) {
     $newRow = [PSCustomObject]@{
-        sender = ""
+        sender    = ""
         recipient = ""
-        rule = $choice
+        rule      = $choice
     }
-
-    if ($row.Rule -match '^(?i)from') {
-        $newRow.sender = $row.Rule -replace '.*:', ''
+    # Start Processing Logic
+    if ($row.Rule -match '^(?i)from\+') {
+        if ($row.Rule.Contains('*')) {
+            $address = $row.Rule -replace '^.*@', ''
+        }
+        else {
+            $address = $row.Rule -replace '^.*:', ''
+        }
+        $newRow.sender = $address
         $newRow.recipient = $domain
-    } elseif ($row.Rule -match '^(?i)to') {
-        $newRow.sender = $domain
-        $newRow.recipient = $row.Rule -replace '.*:', ''
     }
-
-    $newData += $newRow
+    elseif ($row.Rule -match '^(?i)to\+') {
+        if ($row.Rule.Contains('*')) {
+            $address = $row.Rule -replace '^.*@', ''
+        }
+        else {
+            $address = $row.Rule -replace '^.*:', ''
+        }
+        $newRow.recipient = $address
+        $newRow.sender = $domain
+    }
+    elseif ($row.Rule -match '^(?i)ip:') {
+        continue # Skip this row
+    }
+    else {
+        continue # Skip any other rows that don't match the criteria
+    }
+    # End Processing Logic
+    if ($newRow.sender -ne "" -or $newRow.recipient -ne "") {
+        $newData += $newRow
+    }
 }
 
 # Export the new data to a new CSV file
